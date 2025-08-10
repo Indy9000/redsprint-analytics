@@ -30,10 +30,11 @@ type Data struct {
 }
 
 type App struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	APIKey    string    `json:"api_key"`
-	CreatedAt time.Time `json:"created_at"`
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	APIKey         string    `json:"api_key"`
+	CreatedAt      time.Time `json:"created_at"`
+	AllowedOrigins []string  `json:"allowed_origins"`
 }
 
 func NewManager(path string) (*Manager, error) {
@@ -96,7 +97,7 @@ func (m *Manager) AddEvent(event *models.Event) {
 	m.caches[event.AppID].Add(event)
 }
 
-func (m *Manager) CreateApp(name string) (*App, error) {
+func (m *Manager) CreateApp(name string, allowedOrigins []string) (*App, error) {
 	m.dataMu.Lock()
 	defer m.dataMu.Unlock()
 
@@ -117,10 +118,11 @@ func (m *Manager) CreateApp(name string) (*App, error) {
 
 	// Create new App
 	app := &App{
-		ID:        id,
-		Name:      name,
-		APIKey:    apiKey,
-		CreatedAt: time.Now().UTC(),
+		ID:             id,
+		Name:           name,
+		APIKey:         apiKey,
+		CreatedAt:      time.Now().UTC(),
+		AllowedOrigins: allowedOrigins,
 	}
 
 	// Store the app

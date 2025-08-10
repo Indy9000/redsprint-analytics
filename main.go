@@ -13,24 +13,76 @@ import (
 	"time"
 )
 
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// ENABLE ONLY FOR LOCAL SERVING
-		// // Add CORS headers
-		// w.Header().Set("Access-Control-Allow-Origin", "*")
-		// w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		// w.Header().Set("Access-Control-Allow-Headers", "X-Backend, Content-Type, Authorization")
+func corsMiddlewareWrapper(appMgr *apps.Manager) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// log.Printf("CORS Middleware: Received %s request for %s", r.Method, r.URL.Path)
+			origin := r.Header.Get("Origin")
+			// log.Printf("CORS Middleware: Origin header: %q", origin)
 
-		// // Handle preflight OPTIONS request
-		// if r.Method == "OPTIONS" {
-		// 	log.Println("CORS Middleware: Handling OPTIONS preflight request")
-		// 	w.WriteHeader(http.StatusOK)
-		// 	return
-		// }
+			if origin == "" {
+				// log.Println("CORS Middleware: No Origin header, proceeding without CORS headers")
+				next.ServeHTTP(w, r)
+				return
+			}
 
-		// Pass to the next handler (FirebaseAuthMiddleware)
-		next.ServeHTTP(w, r)
-	})
+			// Handle preflight OPTIONS request
+			if r.Method == http.MethodOptions {
+				// log.Println("CORS Middleware: Handling OPTIONS preflight request")
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-API-Key")
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+
+			// Validate API key for non-OPTIONS requests
+			apiKey := r.Header.Get("X-API-Key")
+			// log.Printf("CORS Middleware: X-API-Key: %q", apiKey)
+			if apiKey == "" {
+				log.Println("CORS Middleware: Missing X-API-Key header")
+				http.Error(w, "Missing API key", http.StatusUnauthorized)
+				return
+			}
+
+			// Get app by API key
+			// log.Println("CORS Middleware: Attempting to fetch app by API key")
+			app, err := appMgr.GetAppByAPIKey(apiKey)
+			if err != nil {
+				log.Printf("CORS Middleware: Failed to get app for API key: %v", err)
+				http.Error(w, "Invalid API key", http.StatusUnauthorized)
+				return
+			}
+			// log.Printf("CORS Middleware: Found app ID: %s, AllowedOrigins: %v", app.ID, app.AllowedOrigins)
+
+			// Check if origin is allowed
+			allowed := false
+			for _, allowedOrigin := range app.AllowedOrigins {
+				if allowedOrigin == origin {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				log.Printf("CORS Middleware: Origin %q not allowed for app %s (allowed: %v)", origin, app.ID, app.AllowedOrigins)
+				http.Error(w, "Origin not allowed", http.StatusForbidden)
+				return
+			}
+			// log.Printf("CORS Middleware: Origin %q allowed for app %s", origin, app.ID)
+
+			// Set CORS headers
+			log.Println("CORS Middleware: Setting CORS headers")
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-API-Key")
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+			// Pass to the next handler
+			// log.Println("CORS Middleware: Passing to next handler")
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func main() {
@@ -41,6 +93,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize config: %v", err)
 	}
+
+	corsMiddleware := corsMiddlewareWrapper(apps)
 
 	// app, err := firebase.NewApp(context.Background(), nil,
 	// 	option.WithCredentialsFile("redsprint-analytics-firebase-adminsdk.json"))

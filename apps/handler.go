@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 )
 
 func (m *Manager) AddAppHandler() http.HandlerFunc {
@@ -20,8 +19,10 @@ func (m *Manager) AddAppHandler() http.HandlerFunc {
 
 		// Parse JSON request body
 		var req struct {
-			Name string `json:"name"`
+			Name           string   `json:"name"`
+			AllowedOrigins []string `json:"allowed_origins"`
 		}
+
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
@@ -34,7 +35,7 @@ func (m *Manager) AddAppHandler() http.HandlerFunc {
 		}
 
 		// Create the app
-		app, err := m.CreateApp(req.Name)
+		app, err := m.CreateApp(req.Name, req.AllowedOrigins)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Failed to create app: %v", err), http.StatusInternalServerError)
 			return
@@ -45,14 +46,12 @@ func (m *Manager) AddAppHandler() http.HandlerFunc {
 		w.WriteHeader(http.StatusCreated)
 
 		// Respond with the created app
-		resp := struct {
-			Name      string    `json:"name"`
-			APIKey    string    `json:"api_key"`
-			CreatedAt time.Time `json:"created_at"`
-		}{
-			Name:      app.Name,
-			APIKey:    app.APIKey,
-			CreatedAt: app.CreatedAt,
+		resp := App{
+			ID:             app.ID,
+			Name:           app.Name,
+			APIKey:         app.APIKey,
+			CreatedAt:      app.CreatedAt,
+			AllowedOrigins: app.AllowedOrigins,
 		}
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			log.Printf("Failed to encode response: %v", err)
