@@ -102,6 +102,22 @@ dart run bin/analyser.dart -d ../bin/data unique user.session_id
 dart run bin/analyser.dart -d ../bin/data unique location.ip
 ```
 
+#### `attribution <conversion_filter> <source_filter>`
+Track conversions attributed to traffic sources by analyzing user journeys.
+
+Filters use the same syntax as the `--filter` option: `field=value`, `field!=value`, `field contains value`, etc.
+
+```bash
+# Find Facebook referrals that led to Stripe checkouts
+dart run bin/analyser.dart -d ../bin/data attribution "web_specific.referrer contains checkout.stripe" "web_specific.referrer contains facebook"
+
+# Track which sources led to purchases
+dart run bin/analyser.dart -d ../bin/data attribution "event_name=purchase" "web_specific.referrer contains google"
+
+# See if campaign traffic converted
+dart run bin/analyser.dart -d ../bin/data attribution "event_type=click" "web_specific.utm_campaign=120241818854010670"
+```
+
 #### `filter <field> <operator> <value>`
 Filter events by field value.
 
@@ -222,6 +238,31 @@ dart run bin/analyser.dart -d ../bin/data group device.device_model properties.l
 # Events from mobile devices
 dart run bin/analyser.dart -d ../bin/data filter device.screen_resolution contains x739
 ```
+
+### Attribution Analysis
+
+Track conversions attributed to specific traffic sources by analyzing user journeys:
+
+```bash
+# Find users who came from Facebook and later converted via Stripe checkout
+dart run bin/analyser.dart -d ../bin/data attribution "web_specific.referrer contains checkout.stripe" "web_specific.referrer contains facebook"
+
+# Track Google referrals that led to page views
+dart run bin/analyser.dart -d ../bin/data attribution "event_type=page_view" "web_specific.referrer contains google"
+
+# Find users from a specific campaign who later clicked
+dart run bin/analyser.dart -d ../bin/data attribution "event_type=click" "web_specific.utm_campaign=120241818854010670"
+
+# Track conversions from paid traffic (any source)
+dart run bin/analyser.dart -d ../bin/data attribution "event_name=purchase" "web_specific.utm_medium=paid"
+```
+
+The attribution command:
+- Groups events by anonymous user ID
+- Finds users who had conversion events (first filter)
+- Checks if those users had earlier source events (second filter)
+- Reports attribution rate and time to conversion
+- Shows breakdown of which sources drove conversions
 
 ### Campaign Analysis
 
