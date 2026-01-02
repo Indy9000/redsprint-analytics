@@ -5,7 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,14 +22,14 @@ import (
 // //
 type Manager struct {
 	path     string
-	data     *Data
+	data     *Data                  // app collection
 	caches   map[string]*EventCache // Per-app caches
 	dataMu   sync.RWMutex           // Protects data
 	cachesMu sync.RWMutex           // Protects caches
 }
 
 type Data struct {
-	Apps map[string]*App `json:"apps"`
+	Apps map[string]*App `json:"apps"` // appId -> *App
 }
 
 type App struct {
@@ -59,6 +62,12 @@ func NewManager(path string) (*Manager, error) {
 		}
 	}
 
+	// Load recent events into cache
+	if err := m.loadRecentEvents(); err != nil {
+		log.Printf("NewManager: Failed to load recent events: %v", err)
+		// Continue despite error to allow startup
+	}
+
 	return m, nil
 }
 
@@ -81,6 +90,56 @@ func (m *Manager) save() error {
 
 	if err := os.WriteFile(m.path, data, 0644); err != nil {
 		return fmt.Errorf("write config: %w", err)
+	}
+
+	return nil
+}
+
+func (m *Manager) loadRecentEvents() error {
+	startTime := time.Now().UTC().Add(-35 * time.Minute)
+	startDate := startTime.UTC().Truncate(24 * time.Hour)
+	endDate := time.Now().UTC().Truncate(24 * time.Hour).Add(24 * time.Hour)
+
+	m.dataMu.RLock()
+	appIDs := make([]string, 0, len(m.data.Apps))
+	for id := range m.data.Apps {
+		appIDs = append(appIDs, id)
+	}
+	m.dataMu.RUnlock()
+
+	for _, appID := range appIDs {
+		for date := startDate; !date.After(endDate); date = date.Add(24 * time.Hour) {
+			dir := filepath.Join("data", appID, date.Format("20060102"))
+			files, err := os.ReadDir(dir)
+			if os.IsNotExist(err) {
+				continue
+			}
+			if err != nil {
+				log.Printf("loadRecentEvents: Failed to read directory %s for app %s: %v", dir, appID, err)
+				continue
+			}
+
+			for _, file := range files {
+				if !strings.HasSuffix(file.Name(), ".json") {
+					continue
+				}
+				data, err := os.ReadFile(filepath.Join(dir, file.Name()))
+				if err != nil {
+					log.Printf("loadRecentEvents: Failed to read file %s for app %s: %v", file.Name(), appID, err)
+					continue
+				}
+				var event models.Event
+				if err := json.Unmarshal(data, &event); err != nil {
+					log.Printf("loadRecentEvents: Failed to parse event %s for app %s: %v", file.Name(), appID, err)
+					continue
+				}
+				if !event.Timestamp.Before(startTime) {
+					m.AddEvent(&event)
+					log.Printf("loadRecentEvents: Loaded event %s for app %s", event.EventID, appID)
+				}
+			}
+		}
+		log.Printf("loadRecentEvents: Completed loading events for app %s", appID)
 	}
 
 	return nil

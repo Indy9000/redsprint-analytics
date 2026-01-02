@@ -1,0 +1,14 @@
+name: analytics_analyser
+description: A CLI tool to query and analyze JSON analytics events
+version: 1.0.0
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  args: ^2.4.0
+  intl: ^0.19.0
+  path: ^1.8.0
+
+dev_dependencies:
+  lints: ^3.0.0

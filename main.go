@@ -2,6 +2,7 @@ package main
 
 import (
 	"analytics/apps"
+	fba "analytics/firebase_auth"
 	"analytics/tracker"
 	"context"
 	"log"
@@ -112,11 +113,10 @@ func main() {
 	tracker := tracker.NewEventTracker(apps)
 	// Set up the router
 	mux := http.NewServeMux()
-	// mux.Handle("/analytics/api/v1/signin", corsMiddleware(fba.FirebaseAuthMiddleware(admin.SignInHandler())))
-	// mux.Handle("/analytics/api/v1/admin", corsMiddleware(fba.FirebaseAuthMiddleware(credits.SignInHandler())))
-	mux.Handle("/analytics/api/v1/apps", corsMiddleware(apps.AddAppHandler()))
+
+	mux.Handle("/analytics/api/v1/apps", corsMiddleware(fba.FirebaseAuthMiddleware(apps.ListAppsHandler())))
+	mux.Handle("/analytics/api/v1/apps/", corsMiddleware(fba.FirebaseAuthMiddleware(apps.CrudHandler())))
 	mux.Handle("/analytics/api/v1/track", corsMiddleware(tracker.PostHandler()))
-	// mux.Handle("/analytics/api/v1/stats", corsMiddleware(fba.FirebaseAuthMiddleware(credits.SignInHandler())))
 
 	const port = "8115"
 	// Create an HTTP server

@@ -1,0 +1,54 @@
+{
+  "roots": [
+    "analytics_analyser"
+  ],
+  "packages": [
+    {
+      "name": "analytics_analyser",
+      "version": "1.0.0",
+      "dependencies": [
+        "args",
+        "intl",
+        "path"
+      ],
+      "devDependencies": [
+        "lints"
+      ]
+    },
+    {
+      "name": "lints",
+      "version": "3.0.0",
+      "dependencies": []
+    },
+    {
+      "name": "intl",
+      "version": "0.19.0",
+      "dependencies": [
+        "clock",
+        "meta",
+        "path"
+      ]
+    },
+    {
+      "name": "clock",
+      "version": "1.1.2",
+      "dependencies": []
+    },
+    {
+      "name": "path",
+      "version": "1.9.1",
+      "dependencies": []
+    },
+    {
+      "name": "args",
+      "version": "2.7.0",
+      "dependencies": []
+    },
+    {
+      "name": "meta",
+      "version": "1.17.0",
+      "dependencies": []
+    }
+  ],
+  "configVersion": 1
+}
