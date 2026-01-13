@@ -87,11 +87,19 @@ func (m *Manager) getEventsFromCache(appID string, startMinutes int64) ([]models
 	defer cache.mu.RUnlock()
 
 	// Check if startMinutes is within cache window using cache's lastMinute
-	// we do this check so, we can get from the disk
 	cacheLastMinutes := toMinutesSinceEpoch(cache.lastMinute)
 	cacheWindowStart := cacheLastMinutes - (CacheWindowMinutes - 1)
 
+	// Cache miss if request is older than cache window
 	if startMinutes < cacheWindowStart {
+		return nil, false
+	}
+
+	// Cache miss if request is newer than cache's lastMinute
+	// This can happen if the advance() goroutine falls behind real time
+	if startMinutes > cacheLastMinutes {
+		log.Printf("GetEventsHandler: Cache miss - startMinutes (%d) > cacheLastMinutes (%d), falling back to disk",
+			startMinutes, cacheLastMinutes)
 		return nil, false
 	}
 
@@ -107,7 +115,8 @@ func (m *Manager) getEventsFromDisk(appID string, startMinutes int64) ([]models.
 	log.Printf("GetEventsHandler: Scanning disk for events since minute %d (%s)",
 		startMinutes, startTime.Format(time.RFC3339))
 
-	var events []models.Event
+	// Initialize as empty slice (not nil) so JSON encodes as [] not null
+	events := make([]models.Event, 0)
 	startDate := startTime.Truncate(24 * time.Hour)
 	endDate := time.Now().UTC().Truncate(24 * time.Hour)
 
@@ -128,7 +137,7 @@ func (m *Manager) getEventsFromDay(appID string, date time.Time, startMinutes in
 	files, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
 		log.Printf("GetEventsHandler: Directory %s does not exist", dir)
-		return nil, nil
+		return []models.Event{}, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory %s: %v", dir, err)
@@ -140,7 +149,8 @@ func (m *Manager) getEventsFromDay(appID string, date time.Time, startMinutes in
 		return nil, fmt.Errorf("too many files in %s, please narrow time range", dir)
 	}
 
-	var events []models.Event
+	// Initialize as empty slice (not nil) so JSON encodes as [] not null
+	events := make([]models.Event, 0)
 	for _, file := range files {
 		if !strings.HasSuffix(file.Name(), ".json") {
 			continue

@@ -2,6 +2,7 @@ package apps
 
 import (
 	"analytics/models"
+	"log"
 	"sync"
 	"time"
 )
@@ -51,8 +52,17 @@ func (c *EventCache) Add(event *models.Event) {
 }
 
 func (c *EventCache) GetEventsSince(startMinutes int64) []models.Event {
-	var events []models.Event
+	// Initialize as empty slice (not nil) so JSON encodes as [] not null
+	events := make([]models.Event, 0)
 	cacheLastMinutes := toMinutesSinceEpoch(c.lastMinute)
+
+	// Count total events in all buckets for debugging
+	totalEventsInCache := 0
+	for i := 0; i < CacheWindowMinutes; i++ {
+		totalEventsInCache += len(c.buckets[i])
+	}
+	log.Printf("GetEventsSince: cacheLastMinutes=%d, startMinutes=%d, currentIndex=%d, totalEventsInCache=%d",
+		cacheLastMinutes, startMinutes, c.currentIndex, totalEventsInCache)
 
 	// Iterate through all buckets in the circular buffer
 	for i := 0; i < CacheWindowMinutes; i++ {
