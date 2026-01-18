@@ -29,55 +29,50 @@ func NewEventTracker(appMgr *apps.Manager) *EventTracker {
 
 func (h *EventTracker) PostHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Track Event Received %s request for %s", r.Method, r.URL.Path)
+		clientIP := extractClientIP(r)
+		log.Printf("PostHandler: %s %s from %s", r.Method, r.URL.Path, clientIP)
 
 		if r.Method != http.MethodPost {
+			log.Printf("PostHandler: method not allowed: %s from %s", r.Method, clientIP)
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
 
-		// Validate API key
 		apiKey := r.Header.Get("X-API-Key")
 		if apiKey == "" {
-			http.Error(w, "Missing API key", http.StatusUnauthorized)
+			log.Printf("PostHandler: missing API key from %s", clientIP)
+			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
 		app, err := h.appMgr.GetAppByAPIKey(apiKey)
 		if err != nil {
-			http.Error(w, "Invalid API key", http.StatusUnauthorized)
+			log.Printf("PostHandler: invalid API key (%s) from %s", apiKey, clientIP)
+			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
-		// Parse event
 		var event models.Event
 		if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
-			http.Error(w, "Invalid event data", http.StatusBadRequest)
+			log.Printf("PostHandler: failed to decode event from %s (app=%s): %v", clientIP, app.ID, err)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		// Enrich event
 		h.enrichEvent(&event, app.ID, r)
 
-		// Log event as JSON
-		eventJSON, err := json.Marshal(event)
-		if err != nil {
-			log.Printf("Failed to marshal event: %v", err)
-		} else {
-			log.Printf("Event received: %s", eventJSON)
-		}
+		log.Printf("PostHandler: event received (app=%s, eventID=%s, type=%s, name=%s, userID=%s, sessionID=%s)",
+			app.ID, event.EventID, event.EventType, event.EventName, event.User.ID, event.User.SessionID)
 
 		h.appMgr.AddEvent(&event)
 		if err := h.saveEvent(&event, app.ID); err != nil {
-			http.Error(w, "Failed to save event", http.StatusInternalServerError)
-			log.Printf("Failed to save event: %v", err)
+			log.Printf("PostHandler: failed to save event (app=%s, eventID=%s): %v", app.ID, event.EventID, err)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		// Buffer event
-		// h.buffer.Add(&event)
+		// log.Printf("PostHandler: event saved (app=%s, eventID=%s)", app.ID, event.EventID)
 
-		// Response
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":   "success",

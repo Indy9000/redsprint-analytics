@@ -54,16 +54,16 @@ func (m *Manager) parseRequest(r *http.Request) (string, int64, error) {
 			return "", 0, fmt.Errorf("invalid start-minutes-since-epoch format")
 		}
 		startMinutes = parsed
-		log.Printf("GetEventsHandler: Parsed start minutes: %d (%s)",
-			startMinutes, fromMinutesSinceEpoch(startMinutes).Format(time.RFC3339))
+		// log.Printf("GetEventsHandler: Parsed start minutes: %d (%s)",
+		// 	startMinutes, fromMinutesSinceEpoch(startMinutes).Format(time.RFC3339))
 	}
 
 	return appID, startMinutes, nil
 }
 
 func (m *Manager) getEvents(appID string, startMinutes int64) ([]models.Event, error) {
-	log.Printf("GetEventsHandler: Looking for events since minute %d (%s)",
-		startMinutes, fromMinutesSinceEpoch(startMinutes).Format(time.RFC3339))
+	// log.Printf("GetEventsHandler: Looking for events since minute %d (%s)",
+	// 	startMinutes, fromMinutesSinceEpoch(startMinutes).Format(time.RFC3339))
 
 	// Try cache first
 	if events, found := m.getEventsFromCache(appID, startMinutes); found {
@@ -112,8 +112,8 @@ func (m *Manager) getEventsFromCache(appID string, startMinutes int64) ([]models
 
 func (m *Manager) getEventsFromDisk(appID string, startMinutes int64) ([]models.Event, error) {
 	startTime := fromMinutesSinceEpoch(startMinutes)
-	log.Printf("GetEventsHandler: Scanning disk for events since minute %d (%s)",
-		startMinutes, startTime.Format(time.RFC3339))
+	// log.Printf("GetEventsHandler: Scanning disk for events since minute %d (%s)",
+	// 	startMinutes, startTime.Format(time.RFC3339))
 
 	// Initialize as empty slice (not nil) so JSON encodes as [] not null
 	events := make([]models.Event, 0)
@@ -128,7 +128,7 @@ func (m *Manager) getEventsFromDisk(appID string, startMinutes int64) ([]models.
 		events = append(events, dayEvents...)
 	}
 
-	log.Printf("GetEventsHandler: Retrieved %d events from disk", len(events))
+	// log.Printf("GetEventsHandler: Retrieved %d events from disk", len(events))
 	return events, nil
 }
 
@@ -136,14 +136,14 @@ func (m *Manager) getEventsFromDay(appID string, date time.Time, startMinutes in
 	dir := filepath.Join("data", appID, date.Format("20060102"))
 	files, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
-		log.Printf("GetEventsHandler: Directory %s does not exist", dir)
+		// log.Printf("GetEventsHandler: Directory %s does not exist", dir)
 		return []models.Event{}, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory %s: %v", dir, err)
 	}
 
-	log.Printf("GetEventsHandler: Found %d files in %s", len(files), dir)
+	// log.Printf("GetEventsHandler: Found %d files in %s", len(files), dir)
 
 	if len(files) > 10000 {
 		return nil, fmt.Errorf("too many files in %s, please narrow time range", dir)
@@ -192,7 +192,7 @@ func (m *Manager) sendResponse(w http.ResponseWriter, events []models.Event, app
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
-	log.Printf("GetEventsHandler: Returned %d events for app %s", len(events), appID)
+	// log.Printf("GetEventsHandler: Returned %d events for app %s", len(events), appID)
 }
 
 // func (m *Manager) GetEventsHandler() http.HandlerFunc {
