@@ -7,6 +7,7 @@ import (
 type Event struct {
 	EventID    string                 `json:"event_id"`
 	Timestamp  time.Time              `json:"timestamp"`
+	LocalTime  time.Time              `json:"local_time"`
 	AppID      string                 `json:"app_id"`
 	AppVersion string                 `json:"app_version,omitempty"`
 	EventType  string                 `json:"event_type"`

@@ -103,6 +103,12 @@ func (h *EventTracker) saveEvent(event *models.Event, appID string) error {
 	return nil
 }
 
+const (
+	// MaxTimestampDrift is the maximum allowed difference between event timestamp and server time
+	// Events with timestamps outside this range will be corrected to server time
+	MaxTimestampDrift = 5 * time.Minute
+)
+
 func (h *EventTracker) enrichEvent(event *models.Event, appID string, r *http.Request) {
 	// Set app ID
 	event.AppID = appID
@@ -112,9 +118,22 @@ func (h *EventTracker) enrichEvent(event *models.Event, appID string, r *http.Re
 		event.EventID = uuid.Must(uuid.NewV7()).String()
 	}
 
-	// Set timestamp if missing
+	// Set or validate timestamp
+	serverNow := time.Now().UTC()
 	if event.Timestamp.IsZero() {
-		event.Timestamp = time.Now().UTC()
+		event.Timestamp = serverNow
+	} else {
+		// Check for unreasonable timestamps and correct them
+		drift := event.Timestamp.Sub(serverNow)
+		if drift > MaxTimestampDrift {
+			log.Printf("enrichEvent: Event timestamp too far in future (drift=%v), correcting to server time. Original=%s, Corrected=%s",
+				drift, event.Timestamp.Format(time.RFC3339), serverNow.Format(time.RFC3339))
+			event.Timestamp = serverNow
+		} else if drift < -MaxTimestampDrift {
+			log.Printf("enrichEvent: Event timestamp too far in past (drift=%v), correcting to server time. Original=%s, Corrected=%s",
+				drift, event.Timestamp.Format(time.RFC3339), serverNow.Format(time.RFC3339))
+			event.Timestamp = serverNow
+		}
 	}
 
 	// Extract client IP
