@@ -3,6 +3,7 @@ package tracker
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -52,17 +53,22 @@ func (h *EventTracker) PostHandler() http.HandlerFunc {
 			return
 		}
 
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			log.Printf("PostHandler: failed to read body from %s (app=%s): %v", clientIP, app.ID, err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		log.Printf("PostHandler: body received (app=%s): %s", app.ID, body)
+
 		var event models.Event
-		if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
+		if err := json.Unmarshal(body, &event); err != nil {
 			log.Printf("PostHandler: failed to decode event from %s (app=%s): %v", clientIP, app.ID, err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
 		h.enrichEvent(&event, app.ID, r)
-
-		log.Printf("PostHandler: event received (app=%s, eventID=%s, type=%s, name=%s, userID=%s, sessionID=%s)",
-			app.ID, event.EventID, event.EventType, event.EventName, event.User.ID, event.User.SessionID)
 
 		h.appMgr.AddEvent(&event)
 		if err := h.saveEvent(&event, app.ID); err != nil {
